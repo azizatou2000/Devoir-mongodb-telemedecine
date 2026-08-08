@@ -1,0 +1,190 @@
+# =========================================================================
+# docker-compose.yml — Cluster MongoDB shardé (Plateforme Télémédecine)
+# =========================================================================
+# Topologie complète (16 mongo + 1 init) :
+#   - ConfigRS   : 3 config servers  (cfg0, cfg1, cfg2)          port 27019
+#   - ShardRS1   : 3 nœuds           (shard1a/b/c)               port 27018
+#   - ShardRS2   : 3 nœuds           (shard2a/b/c)               port 27018
+#   - ShardRS3   : 3 nœuds           (shard3a/b/c)               port 27018
+#   - ShardRS4   : 3 nœuds           (shard4a/b/c)               port 27018
+#   - mongos     : routeur, seul point d'entrée client           port 27017
+#
+# PORTABILITÉ multi-OS :
+#   Le keyfile n'est PAS bind-monté directement (les perms/owner d'un bind
+#   mount cassent sur Linux). Le service "keyfile-init" copie (ou génère) le
+#   keyfile dans un volume partagé avec owner=999 (mongodb) + chmod 400, ce
+#   qui marche identiquement sur macOS, Linux et WSL.
+# =========================================================================
+
+# --- Fragment commun (YAML anchor) --------------------------------------
+x-mongod: &mongod
+  image: mongo:7.0
+  restart: unless-stopped
+  networks: [mongo-cluster]
+  depends_on:
+    keyfile-init:
+      condition: service_completed_successfully
+
+services:
+
+  # ==================== INIT KEYFILE (portabilité) =======================
+  # Tourne en root, une seule fois, puis s'arrête. Prépare le keyfile dans
+  # le volume "keyfile" avec les bons owner/permissions pour tous les nœuds.
+  keyfile-init:
+    image: mongo:7.0
+    user: root
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -f /keyfile/mongo-keyfile ]; then
+          if [ -f /seed/mongodb-keyfile ]; then
+            echo "keyfile-init: copie du keyfile fourni (KeyFile/mongodb-keyfile)"
+            cp /seed/mongodb-keyfile /keyfile/mongo-keyfile
+          else
+            echo "keyfile-init: aucun keyfile fourni -> génération d'un nouveau"
+            openssl rand -base64 756 > /keyfile/mongo-keyfile
+          fi
+        else
+          echo "keyfile-init: keyfile déjà présent dans le volume, réutilisé"
+        fi
+        chown 999:999 /keyfile/mongo-keyfile
+        chmod 400 /keyfile/mongo-keyfile
+        echo "keyfile-init: prêt (owner=999, perms=400)"
+    volumes:
+      - keyfile:/keyfile
+      - ./KeyFile:/seed:ro
+    networks: [mongo-cluster]
+
+  # ======================= CONFIG SERVERS (ConfigRS) =====================
+  cfg0:
+    <<: *mongod
+    container_name: cfg0
+    command: mongod --configsvr --replSet ConfigRS --port 27019 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [cfg0_data:/data/db, keyfile:/etc/keyfile:ro]
+  cfg1:
+    <<: *mongod
+    container_name: cfg1
+    command: mongod --configsvr --replSet ConfigRS --port 27019 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [cfg1_data:/data/db, keyfile:/etc/keyfile:ro]
+  cfg2:
+    <<: *mongod
+    container_name: cfg2
+    command: mongod --configsvr --replSet ConfigRS --port 27019 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [cfg2_data:/data/db, keyfile:/etc/keyfile:ro]
+
+  # ============================ SHARD 1 (ShardRS1) =======================
+  shard1a:
+    <<: *mongod
+    container_name: shard1a
+    command: mongod --shardsvr --replSet ShardRS1 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard1a_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard1b:
+    <<: *mongod
+    container_name: shard1b
+    command: mongod --shardsvr --replSet ShardRS1 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard1b_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard1c:
+    <<: *mongod
+    container_name: shard1c
+    command: mongod --shardsvr --replSet ShardRS1 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard1c_data:/data/db, keyfile:/etc/keyfile:ro]
+
+  # ============================ SHARD 2 (ShardRS2) =======================
+  shard2a:
+    <<: *mongod
+    container_name: shard2a
+    command: mongod --shardsvr --replSet ShardRS2 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard2a_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard2b:
+    <<: *mongod
+    container_name: shard2b
+    command: mongod --shardsvr --replSet ShardRS2 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard2b_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard2c:
+    <<: *mongod
+    container_name: shard2c
+    command: mongod --shardsvr --replSet ShardRS2 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard2c_data:/data/db, keyfile:/etc/keyfile:ro]
+
+  # ============================ SHARD 3 (ShardRS3) =======================
+  shard3a:
+    <<: *mongod
+    container_name: shard3a
+    command: mongod --shardsvr --replSet ShardRS3 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard3a_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard3b:
+    <<: *mongod
+    container_name: shard3b
+    command: mongod --shardsvr --replSet ShardRS3 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard3b_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard3c:
+    <<: *mongod
+    container_name: shard3c
+    command: mongod --shardsvr --replSet ShardRS3 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard3c_data:/data/db, keyfile:/etc/keyfile:ro]
+
+  # ============================ SHARD 4 (ShardRS4) =======================
+  shard4a:
+    <<: *mongod
+    container_name: shard4a
+    command: mongod --shardsvr --replSet ShardRS4 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard4a_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard4b:
+    <<: *mongod
+    container_name: shard4b
+    command: mongod --shardsvr --replSet ShardRS4 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard4b_data:/data/db, keyfile:/etc/keyfile:ro]
+  shard4c:
+    <<: *mongod
+    container_name: shard4c
+    command: mongod --shardsvr --replSet ShardRS4 --port 27018 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [shard4c_data:/data/db, keyfile:/etc/keyfile:ro]
+
+  # ============================ MONGOS (routeur) =========================
+  mongos:
+    <<: *mongod
+    container_name: mongos
+    command: mongos --configdb ConfigRS/cfg0:27019,cfg1:27019,cfg2:27019 --port 27017 --bind_ip_all --keyFile /etc/keyfile/mongo-keyfile
+    volumes: [keyfile:/etc/keyfile:ro]
+    ports:
+      - "27017:27017"
+    depends_on:
+      keyfile-init:
+        condition: service_completed_successfully
+      cfg0:
+        condition: service_started
+      cfg1:
+        condition: service_started
+      cfg2:
+        condition: service_started
+      shard1a:
+        condition: service_started
+      shard2a:
+        condition: service_started
+      shard3a:
+        condition: service_started
+      shard4a:
+        condition: service_started
+
+networks:
+  mongo-cluster:
+    driver: bridge
+
+volumes:
+  keyfile:
+  cfg0_data:
+  cfg1_data:
+  cfg2_data:
+  shard1a_data:
+  shard1b_data:
+  shard1c_data:
+  shard2a_data:
+  shard2b_data:
+  shard2c_data:
+  shard3a_data:
+  shard3b_data:
+  shard3c_data:
+  shard4a_data:
+  shard4b_data:
+  shard4c_data:

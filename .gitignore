@@ -1,0 +1,72 @@
+# ============================================
+# SECRETS 
+# ============================================
+KeyFile/
+KeyFile/mongodb-keyfile
+*.keyfile
+*.pem
+*.key
+*.crt
+.env
+.env.*
+!.env.example
+
+# ============================================
+# Données MongoDB natives (générées par mongod dans
+# Config/, Router/, Shard1/ à Shard4/ quand le cluster
+# tourne en natif via start-mongod.ps1 / start-mongos.ps1)
+# ============================================
+**/data/
+**/db/
+**/*.wt
+**/WiredTiger*
+**/journal/
+**/diagnostic.data/
+**/_mdb_catalog.wt
+**/sizeStorer.wt
+**/storage.bson
+**/mongod.lock
+**/mongos.lock
+**/*.turtle
+**/*diagnostic.data/
+
+# ============================================
+# Logs 
+# ============================================
+**/*.log
+**/log/
+**/logs/
+
+# ============================================
+# Sauvegardes locales (mongodump)
+# ============================================
+backup-*/
+dump/
+*.dump
+
+# ============================================
+# Docker (au cas où)
+# ============================================
+docker-compose.override.yml
+
+# ============================================
+# Système d'exploitation
+# ============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Éditeurs / IDE
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============================================
+# Divers
+# ============================================
+*.tmp
+*.bak
+*.orig
